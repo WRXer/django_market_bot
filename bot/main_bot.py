@@ -5,7 +5,7 @@ import os
 from telebot import types
 from telebot.async_telebot import AsyncTeleBot
 from django.conf import settings
-from bot.database_sync import get_or_create_user, get_categories, get_subcategories
+from bot.database_sync import get_or_create_user, get_categories, get_subcategories, get_products
 from bot.views import is_user_subscribed
 
 
@@ -13,7 +13,7 @@ locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')    #Установка лока�
 
 bot = AsyncTeleBot(settings.TOKEN_BOT, parse_mode='HTML')
 telebot.logger.setLevel(settings.LOG_LEVEL)
-
+user_state = {}
 
 @bot.message_handler(commands=['help', 'start'])
 async def send_welcome(message):
@@ -77,7 +77,9 @@ async def category_handler(callback):
     :param callback:
     :return:
     """
+    user_state[callback.from_user.id] = {}
     category_id = int(callback.data.split('_')[1])
+    user_state[callback.from_user.id]["category_id"] = category_id    #Запоминаем категорию, выбранную пользователем
     subcategories = await get_subcategories(category_id)
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     for subcategory in subcategories:
@@ -85,4 +87,17 @@ async def category_handler(callback):
     keyboard.add(types.InlineKeyboardButton("Назад", callback_data='catalog'))
     await bot.edit_message_text(chat_id=callback.message.chat.id, message_id=callback.message.message_id, text="Выберите подкатегорию:", reply_markup=keyboard)
 
-
+@bot.callback_query_handler(func=lambda callback: callback.data.startswith("subcategory_"))
+async def subcategory_handler(callback):
+    """
+    Обработка кнопки подкатегории(вывод продуктов)
+    :param callback:
+    :return:
+    """
+    subcategory_id = int(callback.data.split('_')[1])
+    products = await get_products(subcategory_id)
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    for product in products:
+        keyboard.add(types.InlineKeyboardButton(text=product.name, callback_data=f"product_{product.id}"))
+    keyboard.add(types.InlineKeyboardButton("Назад", callback_data=f'category_{user_state[callback.from_user.id]["category_id"]}'))    #Кнопка для возврата в список подкатегорий
+    await bot.edit_message_text(chat_id=callback.message.chat.id, message_id=callback.message.message_id, text="Выберите продукт:", reply_markup=keyboard)

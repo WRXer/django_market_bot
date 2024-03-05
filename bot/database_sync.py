@@ -1,6 +1,6 @@
 from channels.db import database_sync_to_async
 
-from market.models import TelegramUser, Category, SubCategory
+from market.models import TelegramUser, Category, SubCategory, Product
 
 
 @database_sync_to_async
@@ -29,3 +29,12 @@ def get_subcategories(category_id):
     :return:
     """
     return list(SubCategory.objects.filter(category_id=category_id))
+
+@database_sync_to_async
+def get_products(subcategory_id):
+    """
+    Получение продукта
+    :param user_id:
+    :return:
+    """
+    return list(Product.objects.filter(subcategory_id=subcategory_id))
