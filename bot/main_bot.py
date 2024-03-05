@@ -5,7 +5,7 @@ import os
 from telebot import types
 from telebot.async_telebot import AsyncTeleBot
 from django.conf import settings
-from bot.database_sync import get_or_create_user, get_categories
+from bot.database_sync import get_or_create_user, get_categories, get_subcategories
 from bot.views import is_user_subscribed
 
 
@@ -32,9 +32,6 @@ async def send_welcome(message):
         button_faq = types.InlineKeyboardButton("FAQ", callback_data='faq')
         keyboard.add(button_catalog, button_my_cart, button_faq)
         await bot.send_message(message.chat.id, "Выберите действие:", reply_markup=keyboard)    #Отправляем приветственное сообщение с клавиатурой
-
-
-
     else:    # Пользователь не подписан, отправляем сообщение с предложением подписаться
         keyboard = types.InlineKeyboardMarkup()
         subscribe_button = types.InlineKeyboardButton("Подписаться", url=f"https://t.me/{chat_id}")
@@ -43,7 +40,7 @@ async def send_welcome(message):
         await bot.send_message(message.chat.id,"Для использования бота, подпишитесь на наш канал.", reply_markup=keyboard)
 
 @bot.callback_query_handler(func=lambda callback: callback.data == "start")
-async def query_handler(callback):
+async def main_handler(callback):
     user_id = callback.from_user.id
     chat_id = os.getenv('CHANEL_ID')
     if await is_user_subscribed(user_id, chat_id):
@@ -60,7 +57,7 @@ async def query_handler(callback):
 
 
 @bot.callback_query_handler(func=lambda callback: callback.data == "catalog")
-async def query_handler(callback):
+async def catalog_handler(callback):
     """
     Обработка кнопки каталог(вывод категорий)
     :param callback:
@@ -72,3 +69,20 @@ async def query_handler(callback):
         keyboard.add(types.InlineKeyboardButton(text=category.name, callback_data=f"category_{category.id}"))
     keyboard.add(types.InlineKeyboardButton("Назад", callback_data='start'))
     await bot.edit_message_text(chat_id=callback.message.chat.id, message_id=callback.message.message_id, text="Выберите категорию:", reply_markup=keyboard)
+
+@bot.callback_query_handler(func=lambda callback: callback.data.startswith("category_"))
+async def category_handler(callback):
+    """
+    Обработка кнопки категории(вывод подкатегорий)
+    :param callback:
+    :return:
+    """
+    category_id = int(callback.data.split('_')[1])
+    subcategories = await get_subcategories(category_id)
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    for subcategory in subcategories:
+        keyboard.add(types.InlineKeyboardButton(text=subcategory.name, callback_data=f"subcategory_{subcategory.id}"))
+    keyboard.add(types.InlineKeyboardButton("Назад", callback_data='catalog'))
+    await bot.edit_message_text(chat_id=callback.message.chat.id, message_id=callback.message.message_id, text="Выберите подкатегорию:", reply_markup=keyboard)
+
+
