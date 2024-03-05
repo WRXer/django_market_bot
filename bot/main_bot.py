@@ -14,6 +14,7 @@ locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')    #Установка лока�
 bot = AsyncTeleBot(settings.TOKEN_BOT, parse_mode='HTML')
 telebot.logger.setLevel(settings.LOG_LEVEL)
 
+
 @bot.message_handler(commands=['help', 'start'])
 async def send_welcome(message):
     """
@@ -31,6 +32,9 @@ async def send_welcome(message):
         button_faq = types.InlineKeyboardButton("FAQ", callback_data='faq')
         keyboard.add(button_catalog, button_my_cart, button_faq)
         await bot.send_message(message.chat.id, "Выберите действие:", reply_markup=keyboard)    #Отправляем приветственное сообщение с клавиатурой
+
+
+
     else:    # Пользователь не подписан, отправляем сообщение с предложением подписаться
         keyboard = types.InlineKeyboardMarkup()
         subscribe_button = types.InlineKeyboardButton("Подписаться", url=f"https://t.me/{chat_id}")
@@ -54,6 +58,7 @@ async def query_handler(callback):
         await asyncio.sleep(5)     #Удаление сообщения после определенного времени
         await bot.delete_message(callback.message.chat.id, message.message_id)
 
+
 @bot.callback_query_handler(func=lambda callback: callback.data == "catalog")
 async def query_handler(callback):
     """
@@ -65,4 +70,5 @@ async def query_handler(callback):
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     for category in categories:
         keyboard.add(types.InlineKeyboardButton(text=category.name, callback_data=f"category_{category.id}"))
+    keyboard.add(types.InlineKeyboardButton("Назад", callback_data='start'))
     await bot.edit_message_text(chat_id=callback.message.chat.id, message_id=callback.message.message_id, text="Выберите категорию:", reply_markup=keyboard)
