@@ -53,3 +53,7 @@ async def query_handler(callback):
         message = await bot.send_message(callback.message.chat.id, text="Вы все еще не подписаны. Пожалуйста, подпишитесь наш канал.")
         await asyncio.sleep(5)     #Удаление сообщения после определенного времени
         await bot.delete_message(callback.message.chat.id, message.message_id)
+
+@bot.callback_query_handler(func=lambda callback: callback.data == "catalog")
+async def query_handler(callback):
+    pass
