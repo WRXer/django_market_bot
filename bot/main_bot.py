@@ -5,7 +5,7 @@ import os
 from telebot import types
 from telebot.async_telebot import AsyncTeleBot
 from django.conf import settings
-from bot.database_sync import get_or_create_user
+from bot.database_sync import get_or_create_user, get_categories
 from bot.views import is_user_subscribed
 
 
@@ -56,4 +56,13 @@ async def query_handler(callback):
 
 @bot.callback_query_handler(func=lambda callback: callback.data == "catalog")
 async def query_handler(callback):
-    pass
+    """
+    Обработка кнопки каталог(вывод категорий)
+    :param callback:
+    :return:
+    """
+    categories = await get_categories()
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    for category in categories:
+        keyboard.add(types.InlineKeyboardButton(text=category.name, callback_data=f"category_{category.id}"))
+    await bot.edit_message_text(chat_id=callback.message.chat.id, message_id=callback.message.message_id, text="Выберите категорию:", reply_markup=keyboard)
