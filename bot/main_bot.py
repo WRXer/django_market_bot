@@ -120,20 +120,17 @@ async def subcategory_handler(callback):
         print(f"Ошибка удаления сообщения: {e}")
     product_id = int(callback.data.split('_')[1])
     product = await get_product(product_id)
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(types.InlineKeyboardButton(text="Добавить в корзину", callback_data="quantity"))
+    keyboard.add(types.InlineKeyboardButton("Назад", callback_data=f'subcategory_{user_state[callback.message.chat.id]["subcategory_id"]}'))
     try:
         if product.photo:
             photo_path = f"{product.photo}"
-            keyboard = types.InlineKeyboardMarkup(row_width=2)
-            keyboard.add(types.InlineKeyboardButton(text="Добавить в корзину", callback_data="quantity"))
-            keyboard.add(types.InlineKeyboardButton("Назад", callback_data=f'subcategory_{user_state[callback.message.chat.id]["subcategory_id"]}'))
             await bot.send_photo(photo=open(photo_path, 'rb'), chat_id=callback.message.chat.id, caption=f"Выбран продукт: \n{product.name}\n{product.description}", reply_markup=keyboard)
         else:
-            keyboard = types.InlineKeyboardMarkup(row_width=2)
-            keyboard.add(types.InlineKeyboardButton(text="Добавить в корзину", callback_data="quantity"))
-            keyboard.add(types.InlineKeyboardButton("Назад", callback_data=f'subcategory_{user_state[callback.message.chat.id]["subcategory_id"]}'))
             await bot.send_message(chat_id=callback.message.chat.id, text=f"Выбран продукт: \n{product.name}\n{product.description}\nФото отсутствует", reply_markup=keyboard)
     except Exception as e:
-        print(f"Ошибка отправки изображения: {e}")
+        print(f"Ошибка отправки: {e}")
 
 
 
