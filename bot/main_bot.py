@@ -5,7 +5,7 @@ import os
 from telebot import types
 from telebot.async_telebot import AsyncTeleBot
 from django.conf import settings
-from bot.database_sync import get_or_create_user, get_categories, get_subcategories, get_products
+from bot.database_sync import get_or_create_user, get_categories, get_subcategories, get_products, get_product
 from bot.views import is_user_subscribed
 
 
@@ -94,10 +94,48 @@ async def subcategory_handler(callback):
     :param callback:
     :return:
     """
+    try:
+        await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
+    except Exception as e:
+        print(f"Ошибка удаления сообщения: {e}")
     subcategory_id = int(callback.data.split('_')[1])
+    user_state[callback.from_user.id]["subcategory_id"] = subcategory_id
     products = await get_products(subcategory_id)
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     for product in products:
         keyboard.add(types.InlineKeyboardButton(text=product.name, callback_data=f"product_{product.id}"))
     keyboard.add(types.InlineKeyboardButton("Назад", callback_data=f'category_{user_state[callback.from_user.id]["category_id"]}'))    #Кнопка для возврата в список подкатегорий
-    await bot.edit_message_text(chat_id=callback.message.chat.id, message_id=callback.message.message_id, text="Выберите продукт:", reply_markup=keyboard)
+    await bot.send_message(chat_id=callback.message.chat.id, text="Выберите продукт:", reply_markup=keyboard)
+
+@bot.callback_query_handler(func=lambda callback: callback.data.startswith("product_"))
+async def subcategory_handler(callback):
+    """
+    Обработка кнопки выбора определенного продукта
+    :param callback:
+    :return:
+    """
+    try:
+        await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
+    except Exception as e:
+        print(f"Ошибка удаления сообщения: {e}")
+    product_id = int(callback.data.split('_')[1])
+    product = await get_product(product_id)
+    try:
+        if product.photo:
+            photo_path = f"{product.photo}"
+            keyboard = types.InlineKeyboardMarkup(row_width=2)
+            keyboard.add(types.InlineKeyboardButton(text="Добавить в корзину", callback_data="quantity"))
+            keyboard.add(types.InlineKeyboardButton("Назад", callback_data=f'subcategory_{user_state[callback.message.chat.id]["subcategory_id"]}'))
+            await bot.send_photo(photo=open(photo_path, 'rb'), chat_id=callback.message.chat.id, caption=f"Выбран продукт: \n{product.name}\n{product.description}", reply_markup=keyboard)
+        else:
+            keyboard = types.InlineKeyboardMarkup(row_width=2)
+            keyboard.add(types.InlineKeyboardButton(text="Добавить в корзину", callback_data="quantity"))
+            keyboard.add(types.InlineKeyboardButton("Назад", callback_data=f'subcategory_{user_state[callback.message.chat.id]["subcategory_id"]}'))
+            await bot.send_message(chat_id=callback.message.chat.id, text=f"Выбран продукт: \n{product.name}\n{product.description}\nФото отсутствует", reply_markup=keyboard)
+    except Exception as e:
+        print(f"Ошибка отправки изображения: {e}")
+
+
+
+
+

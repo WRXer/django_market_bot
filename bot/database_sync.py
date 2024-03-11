@@ -38,3 +38,12 @@ def get_products(subcategory_id):
     :return:
     """
     return list(Product.objects.filter(subcategory_id=subcategory_id))
+
+@database_sync_to_async
+def get_product(product_id):
+    """
+    Получение выбранного продукта
+    :param user_id:
+    :return:
+    """
+    return Product.objects.get(id=product_id)
