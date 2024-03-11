@@ -119,6 +119,7 @@ async def subcategory_handler(callback):
     except Exception as e:
         print(f"Ошибка удаления сообщения: {e}")
     product_id = int(callback.data.split('_')[1])
+    user_state[callback.from_user.id]["product_id"] = product_id
     product = await get_product(product_id)
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     keyboard.add(types.InlineKeyboardButton(text="Добавить в корзину", callback_data="quantity"))
@@ -132,7 +133,63 @@ async def subcategory_handler(callback):
     except Exception as e:
         print(f"Ошибка отправки: {e}")
 
+@bot.callback_query_handler(func=lambda callback: callback.data == "quantity")
+async def quantity_handler(callback):
+    """
+    Обработка кнопки добавления в корзину
+    :param callback:
+    :return:
+    """
+    try:
+        await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
+    except Exception as e:
+        print(f"Ошибка удаления сообщения: {e}")
+    quantity = 1
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(types.InlineKeyboardButton(text="➖", callback_data=f"decreasequantity_{quantity}"),
+                types.InlineKeyboardButton(text="➕", callback_data=f"increasequantity_{quantity}"))
+    keyboard.add(types.InlineKeyboardButton(text="Назад", callback_data=f"product_{user_state[callback.message.chat.id]["product_id"]}"),
+                types.InlineKeyboardButton(text="Подтвердить", callback_data="confirm_to_cart"))
+    await bot.send_message(chat_id=callback.message.chat.id, text=f"Выберите количество товара: {quantity}", reply_markup=keyboard)
 
+@bot.callback_query_handler(func=lambda callback: callback.data.startswith("increasequantity_"))
+async def increase_quantity_handler(callback):
+    """
+    Логика для увеличения количества товара на 1
+    """
+    user_id = callback.message.chat.id
+    quantity = int(callback.data.split('_')[1])
+    quantity += 1
+    await update_quantity_button(callback.message.chat.id, callback.message.message_id, quantity, user_id)
+
+@bot.callback_query_handler(func=lambda callback: callback.data.startswith("decreasequantity_"))
+async def decrease_quantity_handler(callback):
+    """
+    Логика для уменьшения количества товара на 1
+    """
+    user_id = callback.message.chat.id
+    quantity = int(callback.data.split('_')[1])
+    if quantity > 0:
+        quantity -= 1
+        await update_quantity_button(callback.message.chat.id, callback.message.message_id, quantity, user_id)
+    else:
+        message = await bot.send_message(callback.message.chat.id,text="Количество не может быть меньше 0")
+        await asyncio.sleep(3)      #Удаление сообщения после определенного времени
+        await bot.delete_message(callback.message.chat.id, message.message_id)
+
+
+async def update_quantity_button(chat_id, message_id, quantity, user_id):
+    """
+    Обновляет текст "Количествa" в клавиатуре
+    """
+    quantity = quantity
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(types.InlineKeyboardButton(text="➖", callback_data=f"decreasequantity_{quantity}"),
+                 types.InlineKeyboardButton(text="➕", callback_data=f"increasequantity_{quantity}"))
+    keyboard.add(types.InlineKeyboardButton(text="Назад",
+                                            callback_data=f"product_{user_state[user_id]["product_id"]}"),
+                 types.InlineKeyboardButton(text="Подтвердить", callback_data="confirm_to_cart"))
+    await bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=f"Выберите количество товара: {quantity}", reply_markup=keyboard)
 
 
 
