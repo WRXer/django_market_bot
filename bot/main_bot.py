@@ -6,7 +6,7 @@ from telebot import types
 from telebot.async_telebot import AsyncTeleBot
 from django.conf import settings
 from bot.database_sync import get_or_create_user, get_categories, get_subcategories, get_products, get_product, \
-    record_to_cart, get_list_cart
+    record_to_cart, get_list_cart, get_cart_product, removing_product
 from bot.views import is_user_subscribed
 
 
@@ -207,8 +207,8 @@ async def confirm_to_cart(callback):
     cart = await get_list_cart(user)
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     for item in cart:
-        keyboard.add(types.InlineKeyboardButton(text=f"{item.product.name}: {item.quantity}", callback_data=f"cart_product_{item.product.name} шт"))
-    keyboard.add(types.InlineKeyboardButton(text="Назад", callback_data="start"))
+        keyboard.add(types.InlineKeyboardButton(text=f"{item.product.name}: {item.quantity}", callback_data=f"cart_product_{item.product.id}"))
+    keyboard.add(types.InlineKeyboardButton(text="Назад", callback_data="start"), types.InlineKeyboardButton(text="Оформить заказ", callback_data="check_delivery"))
     await bot.edit_message_text(chat_id=callback.message.chat.id, message_id=callback.message.message_id, text="Корзина: ",
                                 reply_markup=keyboard)
 
@@ -221,8 +221,51 @@ async def my_cart(callback):
     user = await get_or_create_user(user_id)
     cart = await get_list_cart(user)
     keyboard = types.InlineKeyboardMarkup(row_width=2)
+    await bot.delete_message(callback.message.chat.id, callback.message.message_id)
     for item in cart:
         keyboard.add(types.InlineKeyboardButton(text=f"{item.product.name}: {item.quantity} шт", callback_data=f"cart_product_{item.product.id}"))
-    keyboard.add(types.InlineKeyboardButton(text="Назад", callback_data="start"))
-    await bot.edit_message_text(chat_id=callback.message.chat.id, message_id=callback.message.message_id, text="Корзина: ",
+    keyboard.add(types.InlineKeyboardButton(text="Назад", callback_data="start"), types.InlineKeyboardButton(text="Оформить заказ", callback_data="check_delivery"))
+    await bot.send_message(chat_id=callback.message.chat.id, text="Корзина: ",
                                 reply_markup=keyboard)
+
+@bot.callback_query_handler(func=lambda callback: callback.data.startswith("cart_product_"))
+async def cart_product_handler(callback):
+    """
+    Обработка продукта в корзине
+    :param callback:
+    :return:
+    """
+    user_id = callback.message.chat.id
+    user = await get_or_create_user(user_id)
+    cart_product_id = int(callback.data.split('_')[2])
+    product = await get_cart_product(user, cart_product_id)
+    await bot.delete_message(callback.message.chat.id, callback.message.message_id)
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(types.InlineKeyboardButton(text="Удалить", callback_data=f"remove_product_{cart_product_id}"), types.InlineKeyboardButton(text="Назад", callback_data="my_cart"))
+    try:
+        if product.product.photo:
+            photo_path = f"{product.product.photo}"
+            await bot.send_photo(photo=open(photo_path, 'rb'), chat_id=callback.message.chat.id, caption=f"Выбран продукт: \n{product.product.name}\n{product.product.description}", reply_markup=keyboard)
+        else:
+            await bot.send_message(chat_id=callback.message.chat.id, text=f"Выбран продукт: \n{product.product.name}\n{product.product.description}\nФото отсутствует", reply_markup=keyboard)
+    except Exception as e:
+        print(f"Ошибка отправки: {e}")
+
+@bot.callback_query_handler(func=lambda callback: callback.data.startswith("remove_product_"))
+async def cart_product_removing(callback):
+    """
+    Удаление продукта в корзине
+    :param callback:
+    :return:
+    """
+    user_id = callback.message.chat.id
+    user = await get_or_create_user(user_id)
+    cart_product_id = int(callback.data.split('_')[2])
+    product = await get_cart_product(user, cart_product_id)
+    await removing_product(user, cart_product_id)
+    await my_cart(callback)
+    delete_msg = await bot.send_message(callback.message.chat.id, text=f"Продукт {product.product.name} удален")
+    await asyncio.sleep(3)  # Удаление сообщения после определенного времени
+    await bot.delete_message(callback.message.chat.id, delete_msg.message_id)
+
+

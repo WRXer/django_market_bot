@@ -71,5 +71,27 @@ def get_list_cart(user):
     :return:
     """
     list_cart = list(Cart.objects.filter(user=user))
-    print(list_cart)
+    print(f"Пользователь {user} зашел в корзину. {list_cart}")
     return list_cart
+
+@database_sync_to_async
+def get_cart_product(user, cart_product_id):
+    """
+    Получение данных продукта из корзины
+    :param user:
+    :return:
+    """
+    cart_product = Cart.objects.filter(user=user.id, product=cart_product_id).first()
+    print(cart_product)
+    return cart_product
+
+@database_sync_to_async
+def removing_product(user, cart_product_id):
+    """
+    Удаление выбранного продукта из корзины
+    :param user:
+    :param cart_product_id:
+    :return:
+    """
+    cart_product = Cart.objects.filter(user=user.id, product=cart_product_id).first()
+    cart_product.delete()
