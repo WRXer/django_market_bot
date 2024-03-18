@@ -5,7 +5,8 @@ import os
 from telebot import types
 from telebot.async_telebot import AsyncTeleBot
 from django.conf import settings
-from bot.database_sync import get_or_create_user, get_categories, get_subcategories, get_products, get_product
+from bot.database_sync import get_or_create_user, get_categories, get_subcategories, get_products, get_product, \
+    record_to_cart, get_list_cart
 from bot.views import is_user_subscribed
 
 
@@ -145,6 +146,7 @@ async def quantity_handler(callback):
     except Exception as e:
         print(f"Ошибка удаления сообщения: {e}")
     quantity = 1
+    user_state[callback.message.chat.id]["quantity"] = quantity
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     keyboard.add(types.InlineKeyboardButton(text="➖", callback_data=f"decreasequantity_{quantity}"),
                 types.InlineKeyboardButton(text="➕", callback_data=f"increasequantity_{quantity}"))
@@ -183,6 +185,7 @@ async def update_quantity_button(chat_id, message_id, quantity, user_id):
     Обновляет текст "Количествa" в клавиатуре
     """
     quantity = quantity
+    user_state[user_id]["quantity"] = quantity
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     keyboard.add(types.InlineKeyboardButton(text="➖", callback_data=f"decreasequantity_{quantity}"),
                  types.InlineKeyboardButton(text="➕", callback_data=f"increasequantity_{quantity}"))
@@ -191,5 +194,35 @@ async def update_quantity_button(chat_id, message_id, quantity, user_id):
                  types.InlineKeyboardButton(text="Подтвердить", callback_data="confirm_to_cart"))
     await bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=f"Выберите количество товара: {quantity}", reply_markup=keyboard)
 
+@bot.callback_query_handler(func=lambda callback: callback.data == "confirm_to_cart")
+async def confirm_to_cart(callback):
+    """
+    Логика для добавления товара в корзину и отображения корзины
+    """
+    user_id = callback.message.chat.id
+    quantity = user_state[user_id]["quantity"]
+    user = await get_or_create_user(user_id)
+    product = await get_product(user_state[user_id]["product_id"])
+    await record_to_cart(user, product, quantity)
+    cart = await get_list_cart(user)
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    for item in cart:
+        keyboard.add(types.InlineKeyboardButton(text=f"{item.product.name}: {item.quantity}", callback_data=f"{item.product.name}"))
+    keyboard.add(types.InlineKeyboardButton(text="Назад", callback_data="start"))
+    await bot.edit_message_text(chat_id=callback.message.chat.id, message_id=callback.message.message_id, text="Корзина: ",
+                                reply_markup=keyboard)
 
-
+@bot.callback_query_handler(func=lambda callback: callback.data == "my_cart")
+async def my_cart(callback):
+    """
+    Логика для отображения корзины
+    """
+    user_id = callback.message.chat.id
+    user = await get_or_create_user(user_id)
+    cart = await get_list_cart(user)
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    for item in cart:
+        keyboard.add(types.InlineKeyboardButton(text=f"{item.product.name}: {item.quantity}", callback_data=f"{item.product.name}"))
+    keyboard.add(types.InlineKeyboardButton(text="Назад", callback_data="start"))
+    await bot.edit_message_text(chat_id=callback.message.chat.id, message_id=callback.message.message_id, text="Корзина: ",
+                                reply_markup=keyboard)

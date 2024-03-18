@@ -1,5 +1,5 @@
 from django.contrib import admin
-from market.models import TelegramUser, Product, SubCategory, Category
+from market.models import TelegramUser, Product, SubCategory, Category, Cart
 
 
 # Register your models here.
@@ -18,3 +18,7 @@ class SubCategoryAdmin(admin.ModelAdmin):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     pass
+
+@admin.register(Cart)
+class CartAdmin(admin.ModelAdmin):
+    list_display = ['user', 'product', 'quantity']

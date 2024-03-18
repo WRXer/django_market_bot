@@ -1,6 +1,6 @@
 from channels.db import database_sync_to_async
 
-from market.models import TelegramUser, Category, SubCategory, Product
+from market.models import TelegramUser, Category, SubCategory, Product, Cart
 
 
 @database_sync_to_async
@@ -47,3 +47,29 @@ def get_product(product_id):
     :return:
     """
     return Product.objects.get(id=product_id)
+
+@database_sync_to_async
+def record_to_cart(user, product, quantity):
+    """
+    Добавление выбранного продукта в корзину
+    :param user:
+    :return:
+    """
+    #existing_item = Cart.objects.filter(user=user,product=product).first()
+    if Cart.objects.filter(user=user.id,product=product.id).first():
+        existing_item = Cart.objects.filter(user=user.id, product=product.id).first()
+        existing_item.quantity += quantity    #Обновляем количество товара, если уже есть в корзине
+        existing_item.save()
+    else:
+        return Cart.objects.create(user=user, product=product, quantity=quantity)
+
+@database_sync_to_async
+def get_list_cart(user):
+    """
+    Получение списка корзины
+    :param user:
+    :return:
+    """
+    list_cart = list(Cart.objects.filter(user=user))
+    print(list_cart)
+    return list_cart
