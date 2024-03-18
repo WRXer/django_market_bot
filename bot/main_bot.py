@@ -207,7 +207,7 @@ async def confirm_to_cart(callback):
     cart = await get_list_cart(user)
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     for item in cart:
-        keyboard.add(types.InlineKeyboardButton(text=f"{item.product.name}: {item.quantity}", callback_data=f"{item.product.name}"))
+        keyboard.add(types.InlineKeyboardButton(text=f"{item.product.name}: {item.quantity}", callback_data=f"cart_product_{item.product.name} шт"))
     keyboard.add(types.InlineKeyboardButton(text="Назад", callback_data="start"))
     await bot.edit_message_text(chat_id=callback.message.chat.id, message_id=callback.message.message_id, text="Корзина: ",
                                 reply_markup=keyboard)
@@ -222,7 +222,7 @@ async def my_cart(callback):
     cart = await get_list_cart(user)
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     for item in cart:
-        keyboard.add(types.InlineKeyboardButton(text=f"{item.product.name}: {item.quantity}", callback_data=f"{item.product.name}"))
+        keyboard.add(types.InlineKeyboardButton(text=f"{item.product.name}: {item.quantity} шт", callback_data=f"cart_product_{item.product.id}"))
     keyboard.add(types.InlineKeyboardButton(text="Назад", callback_data="start"))
     await bot.edit_message_text(chat_id=callback.message.chat.id, message_id=callback.message.message_id, text="Корзина: ",
                                 reply_markup=keyboard)
