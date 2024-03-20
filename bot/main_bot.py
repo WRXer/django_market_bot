@@ -7,6 +7,7 @@ from telebot.async_telebot import AsyncTeleBot
 from django.conf import settings
 from bot.database_sync import get_or_create_user, get_categories, get_subcategories, get_products, get_product, \
     record_to_cart, get_list_cart, get_cart_product, removing_product
+from bot.payment import create, check
 from bot.views import is_user_subscribed
 
 
@@ -25,6 +26,7 @@ async def send_welcome(message):
     """
     user_id = message.from_user.id
     chat_id = os.getenv('CHANEL_ID')
+    user_state[message.from_user.id] = {}
     telegram_user = await get_or_create_user(user_id)
     if await is_user_subscribed(user_id, chat_id):    # Пользователь подписан, отправляем приветственное сообщение с клавиатурой
         keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -78,7 +80,6 @@ async def category_handler(callback):
     :param callback:
     :return:
     """
-    user_state[callback.from_user.id] = {}
     category_id = int(callback.data.split('_')[1])
     user_state[callback.from_user.id]["category_id"] = category_id    #Запоминаем категорию, выбранную пользователем
     subcategories = await get_subcategories(category_id)
@@ -268,4 +269,50 @@ async def cart_product_removing(callback):
     await asyncio.sleep(3)  # Удаление сообщения после определенного времени
     await bot.delete_message(callback.message.chat.id, delete_msg.message_id)
 
+
+@bot.callback_query_handler(func=lambda callback: callback.data == "check_delivery")
+async def check_delivery(callback):
+    """
+    Отправляем сообщение с просьбой ввести данные для доставки
+    :param callback:
+    :return:
+    """
+    user_id = callback.message.chat.id
+    user_state[user_id]["user_status"] = "waiting_for_delivery_info"
+    await bot.edit_message_text(chat_id=callback.message.chat.id, message_id=callback.message.message_id, text="Введите данные для доставки (например, имя, адрес, контактный номер):")
+
+@bot.message_handler(func=lambda message: True, content_types=['text'])
+async def user_message(message):
+    """
+    Проверяем, какое сообщение пришло от пользователя
+    """
+    if message.from_user:
+        user_id = message.chat.id
+        user = await get_or_create_user(user_id)
+        if user_state[user_id]["user_status"] == "waiting_for_delivery_info":
+            amount = 1  # Сумма платежа
+            payment_url, payment_id = create(amount, message.chat.id)
+            delivery_info = message.text
+            keyboard = types.InlineKeyboardMarkup(row_width=2)
+            keyboard.add(types.InlineKeyboardButton(text="Оплатить", url=payment_url))
+            keyboard.add(types.InlineKeyboardButton(text="Проверить оплату", callback_data=f"check_payment_{payment_id}"))
+            await bot.send_message(chat_id=message.chat.id,
+                                        text="Вы можете произвести оплату", reply_markup=keyboard)
+
+@bot.callback_query_handler(func=lambda callback: callback.data.startswith("check_payment_"))
+async def check_payment(callback):
+    """
+    Проверка оплаты
+    :param callback:
+    :return:
+    """
+    payment_id = callback.data.split('_')[2]
+    print(payment_id)
+    result = check(payment_id)
+    if result == False:
+        await bot.send_message(chat_id=callback.message.chat.id,
+                               text="Оплата еще не прошла или возникла ошибка")
+    else:
+        await bot.send_message(chat_id=callback.message.chat.id,
+                               text="Оплата прошла успешно")
 
